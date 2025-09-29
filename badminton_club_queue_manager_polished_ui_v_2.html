@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>🏸 Badminton Club – Queue & Courts</title>
+  <style>
+    :root{
+      --bg1:#0b1020; --bg2:#0f1a33; --card:#0c142a80; --stroke:#1f2a44; --muted:#223152; --text:#e6ebff; --sub:#a8b3d9;
+      --accent:#7c3aed; --accent2:#22d3ee; --good:#22c55e; --bad:#ef4444; --warn:#f59e0b;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:radial-gradient(1400px 700px at -10% -20%,#182447 0,transparent 50%),
+                       radial-gradient(1200px 700px at 110% 10%,#111a36 0,transparent 45%),
+                       linear-gradient(180deg,var(--bg1),var(--bg2));
+         color:var(--text);font:14px/1.45 ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial;}
+    .wrap{max-width:1280px;margin:0 auto;padding:18px}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+    h1{margin:0 0 4px;font-size:20px;letter-spacing:.2px}
+    .desc{color:var(--sub);font-size:12px}
+
+    .grid{display:grid;grid-template-columns:1fr;grid-template-areas:'queue' 'courts' 'leaderboard';gap:12px}
+    .panel-queue{grid-area:queue}
+    .panel-courts{grid-area:courts}
+    .panel-leaderboard{grid-area:leaderboard}
+    .panel{backdrop-filter: blur(14px); background:var(--card); border:1px solid #1a2541; border-radius:16px; padding:14px; box-shadow:0 20px 60px rgba(0,0,0,.35)}
+
+    input[type=text]{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--stroke);background:#0b1531;color:var(--text);outline:none}
+    input[type=text]:focus{border-color:#3b4c85}
+
+    .btn{cursor:pointer;border:1px solid var(--stroke);background:linear-gradient(135deg,#0b1531,#0a1228);color:var(--text);border-radius:12px;padding:9px 12px;transition:transform .05s ease}
+    .btn:hover{border-color:#34446d}
+    .btn:active{transform:translateY(1px)}
+    .btn.pri{border:none;background:linear-gradient(135deg,var(--accent),var(--accent2));color:white}
+    .btn.good{border:none;background:var(--good);color:#07210f}
+    .btn.bad{border:none;background:var(--bad)}
+    .btn.ghost{background:transparent}
+    .btn.small{padding:6px 8px;font-size:12px;border-radius:10px}
+
+    .stack{display:flex;gap:8px;flex-wrap:wrap}
+    .kpi{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+    .kpi .card{background:#0b1531;border:1px solid var(--stroke);border-radius:14px;padding:10px 12px;min-width:150px}
+    .tag{font-size:11px;color:#a1add4}
+
+    .divider{height:1px;background:linear-gradient(90deg,transparent,#223152,transparent);margin:10px 0}
+
+    .queue{max-height:62vh;overflow:auto}
+    .row{display:flex;align-items:center;gap:8px;padding:8px;border-radius:12px;border:1px solid var(--stroke);margin-bottom:8px;background:linear-gradient(180deg,#0b1531,#0b1430)}
+    .idx{font-weight:700;background:#0e1a3a;border:1px solid #26345e;border-radius:999px;padding:2px 8px;font-size:12px;color:#c9d3ff}
+    .name{font-weight:700}
+    .pill{border:1px solid #2b3b69;background:#0d1a3c;color:#cbd5ff;border-radius:999px;padding:3px 8px;font-size:11px}
+    .muted{color:var(--sub)}
+
+    .courtCard{border:1px solid var(--stroke);border-radius:16px;padding:12px;background:linear-gradient(180deg,#0b1531,#0b1430);margin-bottom:10px}
+    .status{font-size:11px;border:1px solid #374a80;background:#111d40;border-radius:999px;padding:2px 8px;color:#b7c4ff}
+    .teams{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+    .team{background:#0a1431;border:1px dashed #2b3b69;border-radius:12px;padding:8px}
+    .team h4{margin:0 0 6px;font-size:12px;color:#b3c0ef;letter-spacing:.2px}
+    .chips{display:flex;gap:6px;flex-wrap:wrap}
+    .chip{display:inline-flex;gap:6px;align-items:center;background:#0f1b3f;border:1px solid #2a3a67;border-radius:999px;padding:4px 9px}
+    .x{opacity:.85;cursor:pointer;font-weight:700}
+
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;border-bottom:1px solid #1b2746;text-align:left}
+    th{position:sticky;top:0;background:#0b1531;color:#d6defc}
+    td.right{text-align:right}
+    td.center{text-align:center}
+
+    .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#0c1430;border:1px solid #2b3b69;border-radius:12px;padding:10px 14px;z-index:9999;box-shadow:0 12px 40px rgba(0,0,0,.4)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>🏸 Badminton Club – Queue & Courts</h1>
+        <div class="desc">Two courts • Doubles • Ladder split (winners split and face each other with new partners) • Hit 5 wins in a row → moved to queue bottom</div>
+      </div>
+      <div class="stack">
+        <button class="btn" id="saveBtn" title="Save in this browser">💾 Save</button>
+        <button class="btn" id="loadBtn" title="Load from this browser">📂 Load</button>
+        <button class="btn bad" id="resetBtn" title="Clear everything">🗑️ Reset</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Column A: Sign-in & Queue -->
+      <section class="panel panel-queue">
+        <h2>Sign In</h2>
+        <div class="stack" style="margin:.6rem 0 1rem">
+          <input type="text" id="nameInput" placeholder="Player name…" />
+          <button class="btn pri" id="addBtn">Add to Queue</button>
+        </div>
+        <div class="kpi" id="kpis"></div>
+        <div class="divider"></div>
+        <h3>Queue</h3>
+        <div class="desc" style="margin-bottom:6px">Toggle <b>Sit‑Out</b> to keep place but be skipped until ready. Late arrivals append to the end.</div>
+        <div class="queue" id="queueList"></div>
+      </section>
+
+      <!-- Column B: Courts -->
+      <section class="panel panel-courts">
+        <h2>Courts</h2>
+        <div id="courts"></div>
+      </section>
+
+      <!-- Column C: Leaderboard & Summary -->
+      <section class="panel panel-leaderboard">
+        <h2>Leaderboard (This Practice)</h2>
+        <div class="desc" style="margin-bottom:6px">Sorted by Wins → Win% → Games</div>
+        <div id="leaderboardWrap"></div>
+        <div class="divider"></div>
+        <h2>End of Practice</h2>
+        <div class="stack" style="margin:.5rem 0 0.5rem">
+          <button class="btn" id="summaryBtn">📄 Show Summary</button>
+        </div>
+        <div id="summary"></div>
+      </section>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const state = {
+    players: new Map(), // id -> player
+    queue: [],          // array of ids (only not-on-court players)
+    courts: [mkCourt(0), mkCourt(1)],
+    history: [],        // past matches
+  };
+
+  function mkPlayer(name){
+    return {
+      id: crypto.randomUUID(),
+      name: name.trim() || "Player",
+      wins: 0,
+      losses: 0,
+      streak: 0,
+      longestStreak: 0,
+      sittingOut: false,
+      onCourt: null, // 0 or 1
+      joinedAt: Date.now(),
+    };
+  }
+  function mkCourt(idx){ return { id: idx, teams: [[],[]], number: idx+1 }; }
+
+  // -------- Queue helpers --------
+  const inQueue = id => state.queue.includes(id);
+  function addToQueue(id){ if(!inQueue(id)) state.queue.push(id); }
+  function removeFromQueue(id){ state.queue = state.queue.filter(x=>x!==id); }
+  function moveToQueueBottom(id){ removeFromQueue(id); state.queue.push(id); }
+
+  function getNextEligible(){
+    for(let i=0;i<state.queue.length;i++){
+      const pid = state.queue[i];
+      const p = state.players.get(pid);
+      if(p && !p.sittingOut){
+        state.queue.splice(i,1);
+        return pid;
+      }
+    }
+    return null;
+  }
+
+  // -------- Court & Match Flow --------
+  function startMatch(courtIdx){
+    const court = state.courts[courtIdx];
+    if(court.teams[0].length + court.teams[1].length > 0){
+      alert(`Court ${court.number} already has players. Record a winner or cancel to rotate.`);
+      return;
+    }
+    const selected = [];
+    for(let i=0;i<4;i++){ const id = getNextEligible(); if(id) selected.push(id); }
+    if(selected.length<4){
+      alert("Not enough active players for doubles.");
+      // put back to front to preserve order roughly
+      state.queue = [...selected, ...state.queue];
+      renderAll();
+      return;
+    }
+    court.teams[0] = [selected[0], selected[1]];
+    court.teams[1] = [selected[2], selected[3]];
+    court.teams.flat().forEach(pid=>{ const p=state.players.get(pid); if(p) p.onCourt=courtIdx; });
+    renderAll();
+  }
+
+  function recordWinner(courtIdx, teamIdx){
+    const court = state.courts[courtIdx];
+    if(court.teams[0].length!==2 || court.teams[1].length!==2){ alert("Court is not ready."); return; }
+    const winners = court.teams[teamIdx].map(id=>state.players.get(id)).filter(Boolean);
+    const losers  = court.teams[1-teamIdx].map(id=>state.players.get(id)).filter(Boolean);
+
+    winners.forEach(p=>{ p.wins++; p.streak++; p.longestStreak=Math.max(p.longestStreak,p.streak); });
+    losers.forEach(p=>{ p.losses++; p.streak=0; });
+
+    // losers -> bottom
+    losers.forEach(p=>{ p.onCourt=null; addToQueue(p.id); moveToQueueBottom(p.id); });
+
+    // streak cap: at 5, send to bottom & reset
+    let winnersRemain = [];
+    winners.forEach(p=>{
+      if(p.streak>=5){
+        p.streak=0;
+        p.onCourt=null; addToQueue(p.id); moveToQueueBottom(p.id);
+        toast(`${p.name} hit 5 wins – moved to bottom of queue!`);
+      } else {
+        winnersRemain.push(p.id);
+      }
+    });
+
+    // Build next lineup with ladder split
+    const next = {A:[],B:[]};
+    if(winnersRemain.length===2){
+      next.A.push(winnersRemain[0]);
+      next.B.push(winnersRemain[1]);
+      const p1 = getNextEligible(); const p2 = getNextEligible();
+      if(p1) next.A.push(p1); if(p2) next.B.push(p2);
+    } else if(winnersRemain.length===1){
+      next.A.push(winnersRemain[0]);
+      const a2=getNextEligible(), b1=getNextEligible(), b2=getNextEligible();
+      if(a2) next.A.push(a2); if(b1) next.B.push(b1); if(b2) next.B.push(b2);
+    } else {
+      const s=[]; for(let i=0;i<4;i++){ const id=getNextEligible(); if(id) s.push(id); }
+      next.A=s.slice(0,2); next.B=s.slice(2,4);
+    }
+
+    // Save match history
+    state.history.push({
+      time:new Date().toISOString(),
+      court:court.number,
+      teams:[[...court.teams[0]],[...court.teams[1]]],
+      winners: teamIdx===0 ? [...court.teams[0]] : [...court.teams[1]]
+    });
+
+    // Clear onCourt for previous players
+    court.teams.flat().forEach(pid=>{ const p=state.players.get(pid); if(p) p.onCourt=null; });
+
+    // Apply next lineup
+    court.teams=[next.A,next.B];
+    court.teams.flat().forEach(pid=>{ const p=state.players.get(pid); if(p) p.onCourt=courtIdx; });
+
+    renderAll();
+  }
+
+  function cancelMatch(courtIdx){
+    const court = state.courts[courtIdx];
+    court.teams.flat().forEach(pid=>{ const p=state.players.get(pid); if(!p) return; p.onCourt=null; addToQueue(p.id); moveToQueueBottom(p.id); });
+    court.teams=[[],[]];
+    renderAll();
+  }
+
+  // -------- Player actions --------
+  function addPlayerByName(name){ if(!name.trim()) return; const p=mkPlayer(name); state.players.set(p.id,p); addToQueue(p.id); renderAll(); }
+  function toggleSitOut(id){ const p=state.players.get(id); if(!p) return; p.sittingOut=!p.sittingOut; renderAll(); }
+  function removePlayer(id){
+    const p=state.players.get(id); if(!p) return;
+    if(p.onCourt!==null){
+      const c = state.courts[p.onCourt];
+      c.teams = c.teams.map(t=>t.filter(x=>x!==id));
+    }
+    removeFromQueue(id); state.players.delete(id); renderAll();
+  }
+
+  // -------- Leaderboard & Summary --------
+  function getStatsList(){
+    return Array.from(state.players.values()).map(p=>({
+      id:p.id, name:p.name, wins:p.wins, losses:p.losses,
+      games:p.wins+p.losses, streak:p.streak, longest:p.longestStreak,
+      winPct: (p.wins+p.losses)>0 ? (p.wins/(p.wins+p.losses)) : 0,
+      sittingOut:p.sittingOut, onCourt:p.onCourt
+    }));
+  }
+  function sortLeaderboard(list){
+    return list.sort((a,b)=>{
+      if(b.wins!==a.wins) return b.wins-a.wins;
+      if(b.winPct!==a.winPct) return b.winPct-a.winPct;
+      if(b.games!==a.games) return b.games-a.games;
+      return a.name.localeCompare(b.name);
+    });
+  }
+  function renderLeaderboard(){
+    const list = sortLeaderboard(getStatsList());
+    const rows = list.map((s,i)=>`
+      <tr>
+        <td>${i+1}</td>
+        <td>${esc(s.name)}</td>
+        <td class="center">${s.wins}</td>
+        <td class="center">${s.losses}</td>
+        <td class="center">${s.games}</td>
+        <td class="right">${(s.winPct*100).toFixed(1)}%</td>
+        <td class="center">${s.streak}</td>
+        <td class="center">${s.longest}</td>
+      </tr>`).join("");
+    byId('leaderboardWrap').innerHTML = `
+      <table>
+        <thead><tr><th>#</th><th>Player</th><th class="center">W</th><th class="center">L</th><th class="center">G</th><th class="right">Win%</th><th class="center">Streak</th><th class="center">Best</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="8" class="muted">No players yet.</td></tr>'}</tbody>
+      </table>`;
+  }
+
+  function renderKPIs(){
+    const totalPlayers = state.players.size;
+    const inQ = state.queue.length;
+    const onCourtCount = Array.from(state.players.values()).filter(p=>p.onCourt!==null).length;
+    const totalGames = state.history.length;
+    byId('kpis').innerHTML = `
+      <div class="card"><div class="tag">Players</div><div style="font-size:22px">${totalPlayers}</div></div>
+      <div class="card"><div class="tag">In Queue</div><div style="font-size:22px">${inQ}</div></div>
+      <div class="card"><div class="tag">On Courts</div><div style="font-size:22px">${onCourtCount}</div></div>
+      <div class="card"><div class="tag">Matches Played</div><div style="font-size:22px">${totalGames}</div></div>`;
+  }
+
+  function renderQueue(){
+    const out = state.queue.map((id,idx)=>{
+      const p = state.players.get(id); if(!p) return '';
+      return `<div class="row">
+        <div class="idx">#${idx+1}</div>
+        <div class="name">${esc(p.name)}</div>
+        ${p.sittingOut?'<span class="pill">Sitting Out</span>':''}
+        <span class="pill">W ${p.wins}</span>
+        <span class="pill">L ${p.losses}</span>
+        <span class="pill">Streak ${p.streak}</span>
+        <span style="flex:1"></span>
+        <button class="btn small" onclick="app.toggleSitOut('${p.id}')">${p.sittingOut?'Resume':'Sit‑Out'}</button>
+        <button class="btn small bad" onclick="app.removePlayer('${p.id}')">Remove</button>
+      </div>`;
+    }).join('');
+    byId('queueList').innerHTML = out || '<div class="muted">Queue is empty. Add players to begin.</div>';
+  }
+
+  function renderCourts(){
+    const container = byId('courts');
+    const html = state.courts.map(c=>{
+      const canStart = c.teams[0].length===0 && c.teams[1].length===0;
+      const teamHTML = (ti)=>{
+        const arr = c.teams[ti];
+        const chips = arr.map(pid=>{
+          const p = state.players.get(pid); if(!p) return '';
+          return `<span class="chip">${esc(p.name)} <span class="x" title="Kick back to queue" onclick="app.kick('${pid}',${c.id})">×</span></span>`;
+        }).join('');
+        return `<div class="team"><h4>Team ${ti===0?'A':'B'}</h4><div class="chips">${chips||'<span class="muted">Empty</span>'}</div></div>`;
+      };
+      return `<div class="courtCard">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div class="stack" style="align-items:center">
+            <h3 style="margin:0">Court ${c.number}</h3>
+            <span class="status">${canStart?'Idle':'Live match'}</span>
+          </div>
+          <div class="stack">
+            ${canStart? `<button class="btn" onclick="app.startMatch(${c.id})">🎮 Start Match</button>` : ''}
+            <button class="btn bad" onclick="app.cancelMatch(${c.id})">Cancel</button>
+          </div>
+        </div>
+        <div class="teams">${teamHTML(0)}${teamHTML(1)}</div>
+        <div class="stack" style="margin-top:8px">
+          <button class="btn good" onclick="app.recordWinner(${c.id},0)">✅ Team A Won</button>
+          <button class="btn bad"  onclick="app.recordWinner(${c.id},1)">✅ Team B Won</button>
+          <span class="desc">Winners are split; partners pulled from queue automatically.</span>
+        </div>
+      </div>`;
+    }).join('');
+    container.innerHTML = html;
+  }
+
+  function renderSummary(){
+    const games = state.history.length;
+    const list = sortLeaderboard(getStatsList());
+    const top = list[0];
+    const body = list.map(x=>`<tr><td>${esc(x.name)}</td><td class="center">${x.wins}</td><td class="center">${x.losses}</td><td class="center">${x.games}</td><td class="right">${(x.winPct*100).toFixed(1)}%</td><td class="center">${x.longest}</td></tr>`).join('');
+    byId('summary').innerHTML = `
+      <div class="desc">Generated ${new Date().toLocaleString()}</div>
+      <div class="kpi" style="margin:8px 0 8px">
+        <div class="card"><div class="tag">Matches Played</div><div style="font-size:22px">${games}</div></div>
+        <div class="card"><div class="tag">Participants</div><div style="font-size:22px">${state.players.size}</div></div>
+        <div class="card"><div class="tag">Top Player</div><div style="font-size:18px">${top?esc(top.name):'-'}</div></div>
+      </div>
+      <table><thead><tr><th>Player</th><th class="center">W</th><th class="center">L</th><th class="center">G</th><th class="right">Win%</th><th class="center">Best Streak</th></tr></thead>
+        <tbody>${body||'<tr><td colspan="6" class="muted">No stats yet.</td></tr>'}</tbody></table>`;
+  }
+
+  // -------- Persistence --------
+  function save(){
+    const payload = {
+      players: Array.from(state.players.values()),
+      queue: state.queue,
+      courts: state.courts,
+      history: state.history,
+    };
+    localStorage.setItem('badminton_manager_v2', JSON.stringify(payload));
+    toast('Saved to this browser.');
+  }
+  function load(){
+    const raw = localStorage.getItem('badminton_manager_v2');
+    if(!raw){ toast('Nothing saved yet.'); return; }
+    try{
+      const data = JSON.parse(raw);
+      state.players = new Map((data.players||[]).map(p=>[p.id,p]));
+      state.queue = data.queue||[];
+      state.courts = (data.courts||[mkCourt(0),mkCourt(1)]).map(c=>({ id:c.id, teams:[c.teams?.[0]||[], c.teams?.[1]||[]], number:c.number||c.id+1 }));
+      state.history = data.history||[];
+      renderAll(); toast('Loaded.');
+    }catch(e){ console.error(e); alert('Failed to load.'); }
+  }
+  function resetAll(){
+    if(!confirm('Clear all players, queue, courts, and stats?')) return;
+    state.players.clear(); state.queue=[]; state.courts=[mkCourt(0),mkCourt(1)]; state.history=[]; renderAll();
+  }
+
+  // -------- Utilities --------
+  const byId=id=>document.getElementById(id);
+  const esc=s=>String(s).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
+  function toast(msg){ const n=document.createElement('div'); n.className='toast'; n.textContent=msg; document.body.appendChild(n); setTimeout(()=>n.remove(),1600); }
+
+  function bind(){
+    byId('addBtn').onclick = ()=>{ const n=byId('nameInput'); addPlayerByName(n.value); n.value=''; n.focus(); };
+    byId('nameInput').addEventListener('keydown',e=>{ if(e.key==='Enter') byId('addBtn').click(); });
+    byId('summaryBtn').onclick = renderSummary;
+    byId('saveBtn').onclick = save; byId('loadBtn').onclick = load; byId('resetBtn').onclick = resetAll;
+  }
+
+  function renderAll(){ renderQueue(); renderCourts(); renderLeaderboard(); renderKPIs(); }
+
+  // Expose minimal API for inline handlers
+  window.app = {
+    startMatch,
+    recordWinner,
+    cancelMatch,
+    toggleSitOut,
+    removePlayer,
+    kick: (pid,courtIdx)=>{
+      const court = state.courts[courtIdx];
+      const iA=court.teams[0].indexOf(pid), iB=court.teams[1].indexOf(pid);
+      if(iA>-1) court.teams[0].splice(iA,1); else if(iB>-1) court.teams[1].splice(iB,1);
+      const p = state.players.get(pid); if(p){ p.onCourt=null; addToQueue(p.id); moveToQueueBottom(p.id); }
+      const repl = getNextEligible();
+      if(repl!=null){ const slot = court.teams[0].length<=court.teams[1].length ? 0 : 1; court.teams[slot].push(repl); const rp=state.players.get(repl); if(rp) rp.onCourt=courtIdx; }
+      renderAll();
+    }
+  };
+
+  bind(); renderAll();
+})();
+</script>
+</body>
+</html>
